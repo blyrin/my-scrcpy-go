@@ -1,0 +1,7 @@
+{
+  "name": "my-scrcpy-go",
+  "identifier": "cn.blyrin.myscrcpygo",
+  "version": "0.1.0",
+  "icon": "resources/icon.png",
+  "out": "build"
+}

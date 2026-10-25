@@ -1,0 +1,5 @@
+/build/
+/.mygo/
+mygo_windows_*.syso
+/my-scrcpy-go
+/my-scrcpy-go.exe
