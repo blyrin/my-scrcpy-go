@@ -1,0 +1,75 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platforms: windows/amd64,windows/arm64
+          - os: ubuntu-latest
+            platforms: linux/amd64,linux/arm64
+          - os: macos-latest
+            platforms: darwin/arm64,darwin/amd64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Build
+        run: go tool mygo build -platform ${{ matrix.platforms }}
+        env:
+          CGO_ENABLED: "0"
+      - name: Package (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Get-ChildItem build -Directory | ForEach-Object {
+            Compress-Archive -Path "$($_.FullName)/my-scrcpy-go.exe" -DestinationPath "dist/my-scrcpy-go-$($_.Name).zip"
+          }
+      - name: Package (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          mkdir -p dist
+          for dir in build/linux-*; do
+            arch=${dir##*-}
+            zip -j "dist/my-scrcpy-go-linux-$arch.zip" "$dir/my-scrcpy-go"
+          done
+      - name: Package (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          mkdir -p dist
+          for dir in build/darwin-*; do
+            arch=${dir##*-}
+            if [ "$arch" = amd64 ]; then name=macos-x64; else name=macos-arm64; fi
+            ditto -c -k --keepParent "$dir/my-scrcpy-go.app" "dist/my-scrcpy-go-$name.zip"
+          done
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.os }}
+          path: dist/
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
